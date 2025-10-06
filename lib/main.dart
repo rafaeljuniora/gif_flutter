@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _giphyApiKey = 'ZmQjBKeltbRmRkTtDqwSP7bI5xfEvIjp'; // ideal: passe por --dart-define
 const _baseUrl = 'https://api.giphy.com/v1';
+//https://developers.giphy.com/dashboard/
 const Duration _interval = Duration(seconds: 7); // <- novo (7 segundos)
 
 void main() {
@@ -313,3 +314,4 @@ class _GifWithOnloadPing extends StatelessWidget {
     );
   }
 }
+
