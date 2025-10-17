@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+
+import '../../../core/constants/api_constants.dart';
 import '../models/gif_model.dart';
 import '../repositories/giphy_repository.dart';
-
-const autoShuffleInterval = Duration(seconds: 3);
 
 enum ScreenState { idle, loading, success, error }
 
@@ -15,21 +15,13 @@ class RandomGifController extends ChangeNotifier {
   ScreenState _state = ScreenState.idle;
   ScreenState get state => _state;
 
-  List<Gif> _gifs = [];
-  List<Gif> get gifs => _gifs;
-
-  Gif? _singleGif;
-  Gif? get singleGif => _singleGif;
-
-  int _offset = 0;
-  final int _limit = 25;
-  bool _canLoadMore = true;
-  bool get canLoadMore => _canLoadMore;
+  Gif? _gif;
+  Gif? get gif => _gif;
 
   String _errorMessage = '';
   String get errorMessage => _errorMessage;
 
-  bool _autoShuffle = false;
+  bool _autoShuffle = true;
   bool get autoShuffle => _autoShuffle;
 
   Timer? _timer;
@@ -39,72 +31,23 @@ class RandomGifController extends ChangeNotifier {
 
   Future<void> initialize() async {
     await _repository.initRandomId();
+    await fetchRandomGif();
+    _startAutoShuffle();
   }
 
-  Future<void> fetchSingleGif({String? tag, String? rating}) async {
+  Future<void> fetchRandomGif() async {
     if (_state == ScreenState.loading) return;
 
     _state = ScreenState.loading;
-    _errorMessage = '';
     notifyListeners();
 
     try {
       final newGif = await _repository.fetchRandomGif(
-        tag: tag ?? tagController.text,
-        rating: rating ?? this.rating,
-      );
-
-      _singleGif = newGif;
-      _state = ScreenState.success;
-    } catch (e) {
-      if (e.toString().contains('429')) {
-        _errorMessage =
-            'Limite de requisições (429) excedido. Tente novamente.';
-      } else {
-        _errorMessage = e.toString();
-      }
-      _state = ScreenState.error;
-    }
-    notifyListeners();
-  }
-
-  Future<void> fetchGifs({
-    bool isInitial = false,
-    bool isLoadMore = false,
-  }) async {
-    if (_state == ScreenState.loading && !isLoadMore) return;
-    if (isLoadMore && !_canLoadMore) return;
-
-    if (isInitial || !isLoadMore) {
-      _gifs = [];
-      _offset = 0;
-      _canLoadMore = true;
-      _state = ScreenState.loading;
-    } else if (_gifs.isEmpty) {
-      _state = ScreenState.loading;
-    }
-
-    if (!isLoadMore) {
-      notifyListeners();
-    }
-
-    try {
-      final newGifs = await _repository.fetchGifs(
         tag: tagController.text,
         rating: rating,
-        limit: _limit,
-        offset: _offset,
       );
-
-      _gifs.addAll(newGifs);
-      _offset += _limit;
-      _canLoadMore = newGifs.length == _limit;
-
-      if (_gifs.isEmpty && tagController.text.trim().isNotEmpty) {
-        _state = ScreenState.idle;
-      } else {
-        _state = ScreenState.success;
-      }
+      _gif = newGif;
+      _state = ScreenState.success;
     } catch (e) {
       _errorMessage = e.toString();
       _state = ScreenState.error;
@@ -115,31 +58,16 @@ class RandomGifController extends ChangeNotifier {
   void onRatingChanged(String? newRating) {
     rating = newRating ?? 'g';
     notifyListeners();
+    if (_autoShuffle) {
+      fetchRandomGif();
+      _startAutoShuffle();
+    }
   }
-
+  
   void toggleAutoShuffle() {
     _autoShuffle = !_autoShuffle;
     if (_autoShuffle) {
       _startAutoShuffle();
-
-      if (_singleGif == null) {
-        fetchSingleGif();
-      }
-    } else {
-      _timer?.cancel();
-    }
-    notifyListeners();
-  }
-
-  void setAutoShuffle(bool value) {
-    if (_autoShuffle == value) return;
-
-    _autoShuffle = value;
-    if (value) {
-      _startAutoShuffle();
-      if (_singleGif == null) {
-        fetchSingleGif();
-      }
     } else {
       _timer?.cancel();
     }
@@ -149,14 +77,9 @@ class RandomGifController extends ChangeNotifier {
   void _startAutoShuffle() {
     _timer?.cancel();
     if (!_autoShuffle) return;
-
-    _timer = Timer.periodic(autoShuffleInterval, (_) {
-      if (_state != ScreenState.loading) {
-        fetchSingleGif();
-      }
-    });
+    _timer = Timer.periodic(autoShuffleInterval, (_) => fetchRandomGif());
   }
-
+  
   void ping(String? url) {
     _repository.pingAnalytics(url);
   }

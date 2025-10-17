@@ -5,8 +5,6 @@ import '../../repositories/giphy_repository.dart';
 import '../widgets/filter_controls.dart';
 import '../widgets/gif_display.dart';
 
-enum GifView { grid, single }
-
 class RandomGifPage extends StatefulWidget {
   const RandomGifPage({super.key});
 
@@ -16,35 +14,18 @@ class RandomGifPage extends StatefulWidget {
 
 class _RandomGifPageState extends State<RandomGifPage> {
   late final RandomGifController _controller;
-  late final ScrollController _scrollController;
-
-  GifView _currentView = GifView.grid;
 
   @override
   void initState() {
     super.initState();
     _controller = RandomGifController(GiphyRepository());
     _controller.initialize();
-
-    _scrollController = ScrollController();
-    _scrollController.addListener(_onScroll);
-
-    _controller.fetchGifs(isInitial: true);
   }
 
   @override
   void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
     _controller.dispose();
     super.dispose();
-  }
-
-  void _onScroll() {
-    if (_scrollController.position.pixels ==
-        _scrollController.position.maxScrollExtent) {
-      _controller.fetchGifs(isLoadMore: true);
-    }
   }
 
   @override
@@ -57,243 +38,21 @@ class _RandomGifPageState extends State<RandomGifPage> {
             return Column(
               children: [
                 _buildHeader(context),
-                _buildViewToggle(),
-                if (_currentView == GifView.grid ||
-                    _currentView == GifView.single) ...[
-                  FilterControls(
-                    tagController: _controller.tagController,
-                    rating: _controller.rating,
-                    enabled: _controller.state != ScreenState.loading,
-                    onRatingChanged: (newRating) {
-                      _controller.onRatingChanged(newRating);
-                      if (_currentView == GifView.single) {
-                        _controller.fetchSingleGif();
-                      }
-                    },
-                    onFetch: () {
-                      if (_currentView == GifView.grid) {
-                        _controller.fetchGifs(isInitial: true);
-                      } else {
-                        _controller.fetchSingleGif();
-                      }
-                    },
-                  ),
-                  _buildPopularTags(context),
-                  if (_currentView == GifView.grid)
-                    _buildResultsSection(context),
-                ],
-                Expanded(child: _buildBody()),
-                if (_currentView == GifView.single)
-                  _buildAutoShuffleControls(context),
+                FilterControls(
+                  tagController: _controller.tagController,
+                  rating: _controller.rating,
+                  enabled: _controller.state != ScreenState.loading,
+                  onRatingChanged: _controller.onRatingChanged,
+                  onFetch: _controller.fetchRandomGif,
+                ),
+                _buildPopularTags(context),
+                _buildResultsSection(context),
+                Expanded(child: Center(child: _buildBody())),
+                _buildAutoShuffleControls(context),
               ],
             );
           },
         ),
-      ),
-    );
-  }
-
-  Widget _buildViewToggle() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _buildToggleButton(
-            icon: Icons.grid_view_rounded,
-            label: 'Exploração (Grid)',
-            view: GifView.grid,
-          ),
-          const SizedBox(width: 16),
-          _buildToggleButton(
-            icon: Icons.shuffle,
-            label: 'Aleatório (Single)',
-            view: GifView.single,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggleButton({
-    required IconData icon,
-    required String label,
-    required GifView view,
-  }) {
-    final isSelected = _currentView == view;
-    final color = isSelected
-        ? const Color(0xFF8B5CF6)
-        : const Color(0xFF9CA3AF);
-
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _currentView = view;
-
-          if (view == GifView.single) {
-            _controller.toggleAutoShuffle();
-            _controller.fetchSingleGif();
-          } else {
-            _controller.setAutoShuffle(false);
-          }
-        });
-      },
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBody() {
-    return _currentView == GifView.grid ? _buildGridBody() : _buildSingleBody();
-  }
-
-  Widget _buildSingleBody() {
-    if (_controller.state == ScreenState.loading &&
-        _controller.singleGif == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_controller.state == ScreenState.error) {
-      return Center(
-        child: Text('Ocorreu um erro: ${_controller.errorMessage}'),
-      );
-    }
-
-    if (_controller.singleGif == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'Toque no botão de Play para começar o Auto-Load, ou no botão Shuffle abaixo para gerar um GIF aleatório.',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            IconButton(
-              icon: const Icon(
-                Icons.refresh,
-                color: Color(0xFF8B5CF6),
-                size: 32,
-              ),
-              onPressed: _controller.fetchSingleGif,
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: GifDisplay(
-          gif: _controller.singleGif!,
-          onTap: () =>
-              _controller.ping(_controller.singleGif!.analyticsOnClickUrl),
-          onFirstFrame: () {},
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGridBody() {
-    if (_controller.state == ScreenState.loading && _controller.gifs.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_controller.state == ScreenState.error && _controller.gifs.isEmpty) {
-      return Center(
-        child: Text('Ocorreu um erro: ${_controller.errorMessage}'),
-      );
-    }
-
-    if (_controller.gifs.isEmpty) {
-      return Center(
-        child: Text(
-          _controller.tagController.text.isEmpty
-              ? 'Toque em "Buscar" ou selecione uma tag para começar.'
-              : 'Nenhum GIF encontrado para "${_controller.tagController.text}".',
-        ),
-      );
-    }
-
-    return GridView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(12),
-      itemCount: _controller.gifs.length + (_controller.canLoadMore ? 1 : 0),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 200,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemBuilder: (context, index) {
-        if (index == _controller.gifs.length) {
-          return Center(
-            child: _controller.state == ScreenState.loading
-                ? const CircularProgressIndicator()
-                : const Text('Fim dos resultados.'),
-          );
-        }
-
-        final gif = _controller.gifs[index];
-
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: GifDisplay(
-            gif: gif,
-            onTap: () => _controller.ping(gif.analyticsOnClickUrl),
-            onFirstFrame: () {},
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildAutoShuffleControls(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton(
-            tooltip: _controller.autoShuffle
-                ? 'Pausar auto-load'
-                : 'Retomar auto-load',
-            icon: Icon(
-              _controller.autoShuffle ? Icons.pause : Icons.play_arrow,
-              color: const Color(0xFF8B5CF6),
-            ),
-            onPressed: _controller.toggleAutoShuffle,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            _controller.autoShuffle ? 'Auto-load ativo' : 'Auto-load pausado',
-            style: const TextStyle(color: Color(0xFF6B7280), fontSize: 14),
-          ),
-          const SizedBox(width: 16),
-          IconButton(
-            tooltip: 'Carregar próximo GIF',
-            icon: const Icon(Icons.skip_next, color: Color(0xFF8B5CF6)),
-            onPressed: _controller.fetchSingleGif,
-          ),
-        ],
       ),
     );
   }
@@ -311,7 +70,10 @@ class _RandomGifPageState extends State<RandomGifPage> {
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                colors: [
+                  Color(0xFF8B5CF6),
+                  Color(0xFFEC4899),
+                ],
               ),
             ),
             child: const Icon(
@@ -333,9 +95,9 @@ class _RandomGifPageState extends State<RandomGifPage> {
               ),
               Text(
                 'Encontre os melhores GIFs',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: const Color(0xFF9CA3AF)),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF9CA3AF),
+                ),
               ),
             ],
           ),
@@ -380,7 +142,7 @@ class _RandomGifPageState extends State<RandomGifPage> {
 
   Widget _buildTagButton(BuildContext context, String tag) {
     final isSelected = _controller.tagController.text == tag;
-
+    
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
@@ -395,12 +157,7 @@ class _RandomGifPageState extends State<RandomGifPage> {
         child: InkWell(
           onTap: () {
             _controller.tagController.text = tag;
-
-            if (_currentView == GifView.grid) {
-              _controller.fetchGifs(isInitial: true);
-            } else {
-              _controller.fetchSingleGif();
-            }
+            _controller.fetchRandomGif();
           },
           borderRadius: BorderRadius.circular(8),
           child: Padding(
@@ -408,9 +165,7 @@ class _RandomGifPageState extends State<RandomGifPage> {
             child: Text(
               tag,
               style: TextStyle(
-                color: isSelected
-                    ? const Color(0xFF8B5CF6)
-                    : const Color(0xFF374151),
+                color: isSelected ? const Color(0xFF8B5CF6) : const Color(0xFF374151),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -421,10 +176,10 @@ class _RandomGifPageState extends State<RandomGifPage> {
   }
 
   Widget _buildResultsSection(BuildContext context) {
-    final searchTerm = _controller.tagController.text.isEmpty
-        ? 'em alta'
+    final searchTerm = _controller.tagController.text.isEmpty 
+        ? 'aleatório' 
         : _controller.tagController.text;
-
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
@@ -438,13 +193,70 @@ class _RandomGifPageState extends State<RandomGifPage> {
             ),
           ),
           Text(
-            '${_controller.gifs.length} GIFs',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF9CA3AF)),
+            '1 GIF',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: const Color(0xFF9CA3AF),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildAutoShuffleControls(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            tooltip: _controller.autoShuffle
+                ? 'Pausar auto'
+                : 'Retomar auto',
+            icon: Icon(
+              _controller.autoShuffle ? Icons.pause : Icons.play_arrow,
+              color: const Color(0xFF8B5CF6),
+            ),
+            onPressed: _controller.toggleAutoShuffle,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _controller.autoShuffle ? 'Auto ativo' : 'Auto pausado',
+            style: const TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    bool trackedOnLoad = false;
+    switch (_controller.state) {
+      case ScreenState.loading:
+        return const CircularProgressIndicator();
+      case ScreenState.error:
+        return Text('Ocorreu um erro: ${_controller.errorMessage}');
+      case ScreenState.success:
+        final gif = _controller.gif;
+        if (gif == null) {
+          return const Text('Nenhum GIF encontrado.');
+        }
+        return GifDisplay(
+          gif: gif,
+          onTap: () => _controller.ping(gif.analyticsOnClickUrl),
+          onFirstFrame: () {
+            if (!trackedOnLoad) {
+              trackedOnLoad = true;
+              _controller.ping(gif.analyticsOnLoadUrl);
+            }
+          },
+        );
+      case ScreenState.idle:
+      default:
+        return const Text('Toque em "Buscar" ou selecione uma tag.');
+    }
   }
 }
