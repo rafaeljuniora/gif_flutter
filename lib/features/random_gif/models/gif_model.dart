@@ -1,6 +1,5 @@
-// lib/features/random_gif/models/gif_model.dart
 class Gif {
-  final String? id; // usamos a url como id único
+  final String? id; 
   final String? url;
   final String? title;
   final String? analyticsOnLoadUrl;
@@ -25,7 +24,7 @@ class Gif {
     final onclick = (analytics['onclick']?['url']) as String?;
 
     return Gif(
-      id: url, // url como identificador
+      id: url, 
       url: url,
       title: (json['title'] ?? 'Random GIF') as String?,
       analyticsOnLoadUrl: onload,
@@ -33,7 +32,6 @@ class Gif {
     );
   }
 
-  /// Converte para Map (para salvar em SharedPreferences)
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -44,7 +42,6 @@ class Gif {
     };
   }
 
-  /// Reconstrói a partir do Map salvo
   factory Gif.fromMap(Map<String, dynamic> map) {
     return Gif(
       id: map['id'] as String?,
@@ -55,7 +52,6 @@ class Gif {
     );
   }
 
-  /// Igualdade baseada na url/id
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
