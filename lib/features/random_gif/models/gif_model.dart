@@ -11,13 +11,13 @@ class Gif {
     this.analyticsOnClickUrl,
   });
 
-  factory Gif.fromJson(Map<String, dynamic> json) {
-    final images = (json['images'] ?? {}) as Map<String, dynamic>;
-    final downsized = images['downsized_medium'] as Map<String, dynamic>?;
-    final original = images['original'] as Map<String, dynamic>?;
-    final url = (downsized?['url'] ?? original?['url']) as String?;
+  factory Gif.fromJson(Map<dynamic, dynamic> json) {
+    final images = (json['images'] ?? {}) as Map<dynamic, dynamic>;
+    final downsized = images['downsized_medium'] as Map<dynamic, dynamic>?;
+    final original = images['original'] as Map<dynamic, dynamic>?;
+    final url = (downsized?['url'] ?? original?['url']) as dynamic?;
 
-    final analytics = (json['analytics'] ?? {}) as Map<String, dynamic>;
+    final analytics = (json['analytics'] ?? {}) as Map<dynamic, dynamic>;
     final onload = (analytics['onload']?['url']) as String?;
     final onclick = (analytics['onclick']?['url']) as String?;
 
@@ -28,4 +28,21 @@ class Gif {
       analyticsOnClickUrl: onclick,
     );
   }
+
+  Map<dynamic, dynamic> toJson() {
+    return {
+      'url': url,
+      'title': title,
+      'analyticsOnLoadUrl': analyticsOnLoadUrl,
+      'analyticsOnClickUrl': analyticsOnClickUrl,
+    };
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Gif && runtimeType == other.runtimeType && url == other.url;
+
+  @override
+  int get hashCode => url.hashCode;
 }
