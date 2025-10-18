@@ -1,8 +1,8 @@
 class Gif {
-  final String? url;
-  final String? title;
-  final String? analyticsOnLoadUrl;
-  final String? analyticsOnClickUrl;
+  final dynamic url;
+  final dynamic title;
+  final dynamic analyticsOnLoadUrl;
+  final dynamic analyticsOnClickUrl;
 
   Gif({
     this.url,
@@ -13,17 +13,23 @@ class Gif {
 
   factory Gif.fromJson(Map<dynamic, dynamic> json) {
     final images = (json['images'] ?? {}) as Map<dynamic, dynamic>;
-    final downsized = images['downsized_medium'] as Map<dynamic, dynamic>?;
-    final original = images['original'] as Map<dynamic, dynamic>?;
-    final url = (downsized?['url'] ?? original?['url']) as dynamic?;
+
+    final possibleUrls = [
+      images['downsized_medium']?['url'],
+      images['downsized']?['url'],
+      images['original']?['url'],
+      images['fixed_height']?['url'],
+    ];
+
+    final url = possibleUrls.firstWhere((u) => u != null, orElse: () => null);
 
     final analytics = (json['analytics'] ?? {}) as Map<dynamic, dynamic>;
-    final onload = (analytics['onload']?['url']) as String?;
-    final onclick = (analytics['onclick']?['url']) as String?;
+    final onload = analytics['onload']?['url'];
+    final onclick = analytics['onclick']?['url'];
 
     return Gif(
       url: url,
-      title: (json['title'] ?? 'Random GIF') as String?,
+      title: json['title'] ?? 'Random GIF',
       analyticsOnLoadUrl: onload,
       analyticsOnClickUrl: onclick,
     );
