@@ -1,31 +1,32 @@
 class Gif {
   final String? url;
-  final String? title;
-  final String? analyticsOnLoadUrl;
+  final String title;
   final String? analyticsOnClickUrl;
+  final String? analyticsOnLoadUrl;
 
   Gif({
-    this.url,
-    this.title,
-    this.analyticsOnLoadUrl,
+    required this.url,
+    required this.title,
     this.analyticsOnClickUrl,
+    this.analyticsOnLoadUrl,
   });
 
+  bool get hasValidUrl => url != null && url!.isNotEmpty;
+
   factory Gif.fromJson(Map<String, dynamic> json) {
-    final images = (json['images'] ?? {}) as Map<String, dynamic>;
-    final downsized = images['downsized_medium'] as Map<String, dynamic>?;
-    final original = images['original'] as Map<String, dynamic>?;
-    final url = (downsized?['url'] ?? original?['url']) as String?;
-
-    final analytics = (json['analytics'] ?? {}) as Map<String, dynamic>;
-    final onload = (analytics['onload']?['url']) as String?;
-    final onclick = (analytics['onclick']?['url']) as String?;
-
     return Gif(
-      url: url,
-      title: (json['title'] ?? 'Random GIF') as String?,
-      analyticsOnLoadUrl: onload,
-      analyticsOnClickUrl: onclick,
+      url: json['images']?['original']?['url'] ??
+          json['url'], 
+      title: json['title'] ?? '',
+      analyticsOnClickUrl: json['analytics']?['onClick']?['url'],
+      analyticsOnLoadUrl: json['analytics']?['onLoad']?['url'],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'url': url,
+        'title': title,
+        'analyticsOnClickUrl': analyticsOnClickUrl,
+        'analyticsOnLoadUrl': analyticsOnLoadUrl,
+      };
 }

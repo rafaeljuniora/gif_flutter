@@ -43,35 +43,24 @@ class RandomGifController extends ChangeNotifier {
 
   Future<void> fetchSingleGif({String? tag, String? rating}) async {
     if (_state == ScreenState.loading) return;
-
     _state = ScreenState.loading;
     _errorMessage = '';
     notifyListeners();
-
     try {
       final newGif = await _repository.fetchRandomGif(
         tag: tag ?? tagController.text,
         rating: rating ?? this.rating,
       );
-
       _singleGif = newGif;
       _state = ScreenState.success;
     } catch (e) {
-      if (e.toString().contains('429')) {
-        _errorMessage =
-            'Limite de requisições (429) excedido. Tente novamente.';
-      } else {
-        _errorMessage = e.toString();
-      }
+      _errorMessage = e.toString();
       _state = ScreenState.error;
     }
     notifyListeners();
   }
 
-  Future<void> fetchGifs({
-    bool isInitial = false,
-    bool isLoadMore = false,
-  }) async {
+  Future<void> fetchGifs({bool isInitial = false, bool isLoadMore = false}) async {
     if (_state == ScreenState.loading && !isLoadMore) return;
     if (isLoadMore && !_canLoadMore) return;
 
@@ -84,9 +73,7 @@ class RandomGifController extends ChangeNotifier {
       _state = ScreenState.loading;
     }
 
-    if (!isLoadMore) {
-      notifyListeners();
-    }
+    if (!isLoadMore) notifyListeners();
 
     try {
       final newGifs = await _repository.fetchGifs(
@@ -95,16 +82,10 @@ class RandomGifController extends ChangeNotifier {
         limit: _limit,
         offset: _offset,
       );
-
       _gifs.addAll(newGifs);
       _offset += _limit;
       _canLoadMore = newGifs.length == _limit;
-
-      if (_gifs.isEmpty && tagController.text.trim().isNotEmpty) {
-        _state = ScreenState.idle;
-      } else {
-        _state = ScreenState.success;
-      }
+      _state = _gifs.isEmpty ? ScreenState.idle : ScreenState.success;
     } catch (e) {
       _errorMessage = e.toString();
       _state = ScreenState.error;
@@ -118,48 +99,23 @@ class RandomGifController extends ChangeNotifier {
   }
 
   void toggleAutoShuffle() {
-    _autoShuffle = !_autoShuffle;
-    if (_autoShuffle) {
-      _startAutoShuffle();
-
-      if (_singleGif == null) {
-        fetchSingleGif();
-      }
-    } else {
-      _timer?.cancel();
-    }
-    notifyListeners();
+    setAutoShuffle(!_autoShuffle);
   }
 
   void setAutoShuffle(bool value) {
     if (_autoShuffle == value) return;
-
     _autoShuffle = value;
+    _timer?.cancel();
     if (value) {
-      _startAutoShuffle();
-      if (_singleGif == null) {
-        fetchSingleGif();
-      }
-    } else {
-      _timer?.cancel();
+      _timer = Timer.periodic(autoShuffleInterval, (_) {
+        if (_state != ScreenState.loading) fetchSingleGif();
+      });
+      if (_singleGif == null) fetchSingleGif();
     }
     notifyListeners();
   }
 
-  void _startAutoShuffle() {
-    _timer?.cancel();
-    if (!_autoShuffle) return;
-
-    _timer = Timer.periodic(autoShuffleInterval, (_) {
-      if (_state != ScreenState.loading) {
-        fetchSingleGif();
-      }
-    });
-  }
-
-  void ping(String? url) {
-    _repository.pingAnalytics(url);
-  }
+  void ping(String? url) => _repository.pingAnalytics(url);
 
   @override
   void dispose() {
