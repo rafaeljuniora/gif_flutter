@@ -1,54 +1,32 @@
 class Gif {
-  final dynamic url;
-  final dynamic title;
-  final dynamic analyticsOnLoadUrl;
-  final dynamic analyticsOnClickUrl;
+  final String? url;
+  final String title;
+  final String? analyticsOnClickUrl;
+  final String? analyticsOnLoadUrl;
 
   Gif({
-    this.url,
-    this.title,
-    this.analyticsOnLoadUrl,
+    required this.url,
+    required this.title,
     this.analyticsOnClickUrl,
+    this.analyticsOnLoadUrl,
   });
 
-  factory Gif.fromJson(Map<dynamic, dynamic> json) {
-    final images = (json['images'] ?? {}) as Map<dynamic, dynamic>;
+  bool get hasValidUrl => url != null && url!.isNotEmpty;
 
-    final possibleUrls = [
-      images['downsized_medium']?['url'],
-      images['downsized']?['url'],
-      images['original']?['url'],
-      images['fixed_height']?['url'],
-    ];
-
-    final url = possibleUrls.firstWhere((u) => u != null, orElse: () => null);
-
-    final analytics = (json['analytics'] ?? {}) as Map<dynamic, dynamic>;
-    final onload = analytics['onload']?['url'];
-    final onclick = analytics['onclick']?['url'];
-
+  factory Gif.fromJson(Map<String, dynamic> json) {
     return Gif(
-      url: url,
-      title: json['title'] ?? 'Random GIF',
-      analyticsOnLoadUrl: onload,
-      analyticsOnClickUrl: onclick,
+      url: json['images']?['original']?['url'] ??
+          json['url'], 
+      title: json['title'] ?? '',
+      analyticsOnClickUrl: json['analytics']?['onClick']?['url'],
+      analyticsOnLoadUrl: json['analytics']?['onLoad']?['url'],
     );
   }
 
-  Map<dynamic, dynamic> toJson() {
-    return {
-      'url': url,
-      'title': title,
-      'analyticsOnLoadUrl': analyticsOnLoadUrl,
-      'analyticsOnClickUrl': analyticsOnClickUrl,
-    };
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Gif && runtimeType == other.runtimeType && url == other.url;
-
-  @override
-  int get hashCode => url.hashCode;
+  Map<String, dynamic> toJson() => {
+        'url': url,
+        'title': title,
+        'analyticsOnClickUrl': analyticsOnClickUrl,
+        'analyticsOnLoadUrl': analyticsOnLoadUrl,
+      };
 }

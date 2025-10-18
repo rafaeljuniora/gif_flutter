@@ -32,9 +32,7 @@ class _RandomGifPageState extends State<RandomGifPage> {
     _controller.fetchGifs(isInitial: true);
 
     loadFavorites().then((saved) {
-      setState(() {
-        _favorites.addAll(saved);
-      });
+      setState(() => _favorites.addAll(saved));
     });
   }
 
@@ -48,12 +46,13 @@ class _RandomGifPageState extends State<RandomGifPage> {
 
   void _onScroll() {
     if (_scrollController.position.pixels ==
-        _scrollController.position.maxScrollExtent) {
+            _scrollController.position.maxScrollExtent &&
+        _controller.canLoadMore) {
       _controller.fetchGifs(isLoadMore: true);
     }
   }
 
-  // Toggle favorito com persistência
+
   void _toggleFavorite(Gif gif) async {
     setState(() {
       if (_favorites.any((f) => f.url == gif.url)) {
@@ -62,55 +61,42 @@ class _RandomGifPageState extends State<RandomGifPage> {
         _favorites.add(gif);
       }
     });
+    await saveFavorites();
+  }
 
+  Future<void> saveFavorites() async {
     final prefs = await SharedPreferences.getInstance();
-    final favsJson = _favorites
-        .map((gif) => json.encode(gif.toJson()))
-        .toList();
+    final favsJson =
+        _favorites.map((gif) => json.encode(gif.toJson())).toList();
     await prefs.setStringList('favorites', favsJson);
+  }
 
-    // Debug opcional
-    _debugSharedPreferences();
+  Future<List<Gif>> loadFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    final favsJson = prefs.getStringList('favorites') ?? [];
+    final List<Gif> favorites = [];
+
+    for (var jsonStr in favsJson) {
+      try {
+        final map = json.decode(jsonStr);
+        if (map is Map) {
+          favorites.add(Gif.fromJson(Map<String, dynamic>.from(map)));
+        }
+      } catch (_) {}
+    }
+    return favorites;
   }
 
   void _openFavorites() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => FavoritesPage(favorites: _favorites)),
+      MaterialPageRoute(
+        builder: (_) => FavoritesPage(
+          favorites: _favorites,
+          onFavoriteToggle: _toggleFavorite,
+        ),
+      ),
     );
-  }
-
-  Future<List<Gif>> loadFavorites() async {
-  final prefs = await SharedPreferences.getInstance();
-  final favsJson = prefs.getStringList('favorites') ?? [];
-
-  final List<Gif> favorites = [];
-
-  for (var jsonStr in favsJson) {
-    try {
-      final map = json.decode(jsonStr);
-      if (map is Map) {
-        favorites.add(Gif.fromJson(Map<String, dynamic>.from(map)));
-      }
-    } catch (e) {
-      print('Erro ao carregar favorito: $e');
-    }
-  }
-
-  return favorites;
-}
-
-
-  void _debugSharedPreferences() async {
-    final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys();
-    print('Chaves no SharedPreferences: $keys');
-    for (var key in keys) {
-      final value = prefs.get(key);
-      print('Chave: $key -> Valor: $value');
-    }
-    final favsJson = prefs.getStringList('favorites') ?? [];
-    print('Favoritos salvos (raw JSON): $favsJson');
   }
 
   @override
@@ -140,28 +126,24 @@ class _RandomGifPageState extends State<RandomGifPage> {
               children: [
                 _buildHeader(context),
                 _buildViewToggle(),
-                if (_currentView == GifView.grid ||
-                    _currentView == GifView.single) ...[
-                  FilterControls(
-                    tagController: _controller.tagController,
-                    rating: _controller.rating,
-                    enabled: _controller.state != ScreenState.loading,
-                    onRatingChanged: (newRating) {
-                      _controller.onRatingChanged(newRating);
-                      if (_currentView == GifView.single)
-                        _controller.fetchSingleGif();
-                    },
-                    onFetch: () {
-                      if (_currentView == GifView.grid)
-                        _controller.fetchGifs(isInitial: true);
-                      else
-                        _controller.fetchSingleGif();
-                    },
-                  ),
-                  _buildPopularTags(context),
-                  if (_currentView == GifView.grid)
-                    _buildResultsSection(context),
-                ],
+                FilterControls(
+                  tagController: _controller.tagController,
+                  rating: _controller.rating,
+                  enabled: _controller.state != ScreenState.loading,
+                  onRatingChanged: (newRating) {
+                    _controller.onRatingChanged(newRating);
+                    if (_currentView == GifView.single)
+                      _controller.fetchSingleGif();
+                  },
+                  onFetch: () {
+                    if (_currentView == GifView.grid)
+                      _controller.fetchGifs(isInitial: true);
+                    else
+                      _controller.fetchSingleGif();
+                  },
+                ),
+                _buildPopularTags(context),
+                if (_currentView == GifView.grid) _buildResultsSection(context),
                 Expanded(child: _buildBody()),
                 if (_currentView == GifView.single)
                   _buildAutoShuffleControls(context),
@@ -204,9 +186,7 @@ class _RandomGifPageState extends State<RandomGifPage> {
     required GifView view,
   }) {
     final isSelected = _currentView == view;
-    final color = isSelected
-        ? const Color(0xFF8B5CF6)
-        : const Color(0xFF9CA3AF);
+    final color = isSelected ? const Color(0xFF8B5CF6) : const Color(0xFF9CA3AF);
     return InkWell(
       onTap: () {
         setState(() {
@@ -214,8 +194,9 @@ class _RandomGifPageState extends State<RandomGifPage> {
           if (view == GifView.single) {
             _controller.toggleAutoShuffle();
             _controller.fetchSingleGif();
-          } else
+          } else {
             _controller.setAutoShuffle(false);
+          }
         });
       },
       child: Padding(
@@ -241,14 +222,14 @@ class _RandomGifPageState extends State<RandomGifPage> {
       _currentView == GifView.grid ? _buildGridBody() : _buildSingleBody();
 
   Widget _buildSingleBody() {
-    if (_controller.state == ScreenState.loading &&
-        _controller.singleGif == null)
+    if (_controller.state == ScreenState.loading && _controller.singleGif == null)
       return const Center(child: CircularProgressIndicator());
+
     if (_controller.state == ScreenState.error)
-      return Center(
-        child: Text('Ocorreu um erro: ${_controller.errorMessage}'),
-      );
-    if (_controller.singleGif == null) {
+      return Center(child: Text('Ocorreu um erro: ${_controller.errorMessage}'));
+
+    final gif = _controller.singleGif;
+    if (gif == null) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -270,7 +251,7 @@ class _RandomGifPageState extends State<RandomGifPage> {
         ),
       );
     }
-    final gif = _controller.singleGif!;
+
     return Padding(
       padding: const EdgeInsets.all(20.0),
       child: ClipRRect(
@@ -289,10 +270,10 @@ class _RandomGifPageState extends State<RandomGifPage> {
   Widget _buildGridBody() {
     if (_controller.state == ScreenState.loading && _controller.gifs.isEmpty)
       return const Center(child: CircularProgressIndicator());
+
     if (_controller.state == ScreenState.error && _controller.gifs.isEmpty)
-      return Center(
-        child: Text('Ocorreu um erro: ${_controller.errorMessage}'),
-      );
+      return Center(child: Text('Ocorreu um erro: ${_controller.errorMessage}'));
+
     if (_controller.gifs.isEmpty)
       return Center(
         child: Text(
@@ -341,9 +322,7 @@ class _RandomGifPageState extends State<RandomGifPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           IconButton(
-            tooltip: _controller.autoShuffle
-                ? 'Pausar auto-load'
-                : 'Retomar auto-load',
+            tooltip: _controller.autoShuffle ? 'Pausar auto-load' : 'Retomar auto-load',
             icon: Icon(
               _controller.autoShuffle ? Icons.pause : Icons.play_arrow,
               color: const Color(0xFF8B5CF6),
@@ -381,11 +360,7 @@ class _RandomGifPageState extends State<RandomGifPage> {
                 colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
               ),
             ),
-            child: const Icon(
-              Icons.auto_awesome,
-              color: Colors.white,
-              size: 24,
-            ),
+            child: const Icon(Icons.auto_awesome, color: Colors.white, size: 24),
           ),
           const SizedBox(width: 12),
           Column(
@@ -394,15 +369,16 @@ class _RandomGifPageState extends State<RandomGifPage> {
               Text(
                 'GIF Finder',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF374151),
-                ),
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF374151),
+                    ),
               ),
               Text(
                 'Encontre os melhores GIFs',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: const Color(0xFF9CA3AF)),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: const Color(0xFF9CA3AF)),
               ),
             ],
           ),
@@ -429,9 +405,9 @@ class _RandomGifPageState extends State<RandomGifPage> {
           Text(
             'Tags Populares',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF374151),
-            ),
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF374151),
+                ),
           ),
           const SizedBox(height: 16),
           Wrap(
@@ -471,9 +447,7 @@ class _RandomGifPageState extends State<RandomGifPage> {
             child: Text(
               tag,
               style: TextStyle(
-                color: isSelected
-                    ? const Color(0xFF8B5CF6)
-                    : const Color(0xFF374151),
+                color: isSelected ? const Color(0xFF8B5CF6) : const Color(0xFF374151),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -484,9 +458,8 @@ class _RandomGifPageState extends State<RandomGifPage> {
   }
 
   Widget _buildResultsSection(BuildContext context) {
-    final searchTerm = _controller.tagController.text.isEmpty
-        ? 'em alta'
-        : _controller.tagController.text;
+    final searchTerm =
+        _controller.tagController.text.isEmpty ? 'em alta' : _controller.tagController.text;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
@@ -495,15 +468,16 @@ class _RandomGifPageState extends State<RandomGifPage> {
           Text(
             'Resultados para "$searchTerm"',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF374151),
-            ),
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF374151),
+                ),
           ),
           Text(
             '${_controller.gifs.length} GIFs',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF9CA3AF)),
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: const Color(0xFF9CA3AF)),
           ),
         ],
       ),
@@ -511,10 +485,12 @@ class _RandomGifPageState extends State<RandomGifPage> {
   }
 }
 
-// Tela de favoritos
+
 class FavoritesPage extends StatelessWidget {
   final List<Gif> favorites;
-  const FavoritesPage({super.key, required this.favorites});
+  final void Function(Gif) onFavoriteToggle;
+
+  const FavoritesPage({super.key, required this.favorites, required this.onFavoriteToggle});
 
   @override
   Widget build(BuildContext context) {
@@ -539,7 +515,7 @@ class FavoritesPage extends StatelessWidget {
                     onTap: () {},
                     onFirstFrame: () {},
                     isFavorite: true,
-                    onFavoriteToggle: () {},
+                    onFavoriteToggle: () => onFavoriteToggle(gif),
                   ),
                 );
               },
