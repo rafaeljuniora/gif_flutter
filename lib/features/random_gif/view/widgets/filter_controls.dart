@@ -1,12 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
-class FilterControls extends StatelessWidget {
+class FilterControls extends StatefulWidget {
   final TextEditingController tagController;
   final String rating;
   final bool enabled;
   final ValueChanged<String?> onRatingChanged;
   final VoidCallback onFetch;
-  
+
   const FilterControls({
     super.key,
     required this.tagController,
@@ -15,6 +16,35 @@ class FilterControls extends StatelessWidget {
     required this.onRatingChanged,
     required this.onFetch,
   });
+
+  @override
+  State<FilterControls> createState() => _FilterControlsState();
+}
+
+class _FilterControlsState extends State<FilterControls> {
+  Timer? _debounce;
+
+  final FocusNode _focusNode = FocusNode();
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+
+    _debounce = Timer(const Duration(milliseconds: 750), () {
+      widget.onFetch();
+    });
+  }
+
+  void _onSearchSubmitted(String _) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    widget.onFetch();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,15 +62,14 @@ class FilterControls extends StatelessWidget {
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFFF8F9FA),
-                        Color(0xFFE9ECEF),
-                      ],
+                      colors: [Color(0xFFF8F9FA), Color(0xFFE9ECEF)],
                     ),
                   ),
                   child: TextField(
-                    controller: tagController,
-                    enabled: enabled,
+                    controller: widget.tagController,
+                    enabled:
+                        true,
+                    focusNode: _focusNode,
                     decoration: InputDecoration(
                       hintText: 'engraçado',
                       hintStyle: const TextStyle(
@@ -70,7 +99,8 @@ class FilterControls extends StatelessWidget {
                         vertical: 18,
                       ),
                     ),
-                    onSubmitted: (_) => onFetch(),
+                    onChanged: _onSearchChanged,
+                    onSubmitted: _onSearchSubmitted,
                   ),
                 ),
               ),
@@ -81,14 +111,13 @@ class FilterControls extends StatelessWidget {
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF8B5CF6),
-                      Color(0xFFEC4899),
-                    ],
+                    colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
                   ),
                 ),
                 child: ElevatedButton.icon(
-                  onPressed: enabled ? onFetch : null,
+                  onPressed: widget.enabled
+                      ? widget.onFetch
+                      : null,
                   icon: const Icon(
                     Icons.auto_awesome,
                     color: Colors.white,
